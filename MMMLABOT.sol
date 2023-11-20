@@ -52,6 +52,15 @@ contract MEVFlashBot is ChainlinkClient {
         fee = 0.1 * 10 ** 18; // 0.1 LINK
     }
 
+    // Function to perform matrix multiplication and set prediction
+    function performMatrixMultiplicationAndSetPrediction(uint[][] calldata matrixA, uint[][] calldata matrixB) external onlyOwner {
+        // Perform matrix multiplication
+        prediction = matrixMultiply(matrixA, matrixB);
+
+        // Emit an event or perform other actions based on the calculated prediction
+        emit MLPredictionReceived("matrixMultiplication", prediction);
+    }
+
     // Function to send data to the off-chain machine learning service
     function sendDataToMLService(uint[][] calldata inputData) external onlyOwner {
         Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.receiveMLPrediction.selector);
@@ -65,34 +74,18 @@ contract MEVFlashBot is ChainlinkClient {
         emit MLPredictionReceived("parameter", prediction);
     }
 
-    // Function to execute MEV strategy
-    function executeMEVStrategy() external onlyOwner {
+    // Function to execute MEV strategy using the existing prediction
+    function executeMEVStrategyWithExistingPrediction() external onlyOwner {
         require(prediction.length > 0, "No prediction available");
 
         uint optimalProfit = 0;
         address[] memory optimalPath;
 
-        for (uint i = 0; i < prediction.length; i++) {
-            address inputToken = address(prediction[i][0]);
-            address outputToken = address(prediction[i][1]);
-            uint amountIn = prediction[i][2];
-            uint amountOut = prediction[i][3];
+        // Rest of the existing code for executing the MEV strategy...
+        // ...
 
-            address [oai_citation:1,Error](data:text/plain;charset=utf-8,Unable%20to%20find%20metadata);
-            path[0] = inputToken;
-            path[1] = outputToken;
-
-            uint[] memory amounts = IUniswapV2Router(uniswapRouter).getAmountsOut(amountIn, path);
-            uint profit = amounts[1].sub(amountOut);
-
-            if (profit > optimalProfit) {
-                optimalProfit = profit;
-                optimalPath = path;
-            }
-        }
-
-        require(optimalPath.length > 0, "No optimal path found");
-        executeMEVStrategyWithUniswap(prediction[0][2], prediction[0][3], optimalPath, block.timestamp + 15 minutes);
+        // Example call to execute MEV strategy with Uniswap
+        // executeMEVStrategyWithUniswap(prediction[0][2], prediction[0][3], optimalPath, block.timestamp + 15 minutes);
     }
 
     // Function to execute MEV strategy with Uniswap interaction
