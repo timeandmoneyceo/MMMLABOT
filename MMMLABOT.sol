@@ -69,6 +69,51 @@ contract MEVFlashBot is ChainlinkClient {
         }
     }
 
+    // Helper function to convert input data to a string
+    function convertInputDataToString(uint[][] calldata inputData) internal pure returns (string memory) {
+        string memory result = "[";
+        for (uint i = 0; i < inputData.length; i++) {
+            result = string(abi.encodePacked(result, "[", convertArrayToString(inputData[i]), "]"));
+            if (i < inputData.length - 1) {
+                result = string(abi.encodePacked(result, ","));
+            }
+        }
+        result = string(abi.encodePacked(result, "]"));
+        return result;
+    }
+
+    // Helper function to convert an array to a string
+    function convertArrayToString(uint[] calldata arr) internal pure returns (string memory) {
+        string memory result = "";
+        for (uint i = 0; i < arr.length; i++) {
+            result = string(abi.encodePacked(result, uintToString(arr[i])));
+            if (i < arr.length - 1) {
+                result = string(abi.encodePacked(result, ","));
+            }
+        }
+        return result;
+    }
+
+    // Helper function to convert a uint to a string
+    function uintToString(uint v) internal pure returns (string memory) {
+        if (v == 0) {
+            return "0";
+        }
+        uint maxlength = 100;
+        bytes memory reversed = new bytes(maxlength);
+        uint i = 0;
+        while (v != 0) {
+            uint remainder = v % 10;
+            v = v / 10;
+            reversed[i++] = bytes1(uint8(48 + remainder));
+        }
+        bytes memory s = new bytes(i); // Set the length
+        for (uint j = 0; j < i; j++) {
+            s[j] = reversed[i - j - 1]; // Fill the reversed array
+        }
+        return string(s); // Convert to string
+    }
+
     // Function to perform matrix multiplication and set prediction
     function performMatrixMultiplicationAndSetPrediction(uint[][] calldata matrixA, uint[][] calldata matrixB) external onlyOwner {
         // Perform matrix multiplication
@@ -81,7 +126,12 @@ contract MEVFlashBot is ChainlinkClient {
     // Function to send data to the off-chain machine learning service
     function sendDataToMLService(uint[][] calldata inputData) external onlyOwner {
         Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.receiveMLPrediction.selector);
-        req.add("inputData", inputData);
+        string memory inputString = convertInputDataToString(inputData); 
+        // Convert input data to string
+        
+        req.add("inputData", inputString); 
+        // Pass the string as a parameter
+
         sendChainlinkRequestTo(oracle, req, fee);
     }
 
@@ -124,7 +174,7 @@ contract MEVFlashBot is ChainlinkClient {
     // Function to set the profit matrix for a strategy
     function setStrategyProfit(string calldata parameter, uint[][] calldata profitMatrix) external onlyOwner {
         strategyProfits[parameter] = profitMatrix;
-    }
+ }
 
     // Function to get the profit matrix for a strategy
     function getStrategyProfit(string calldata parameter) external view returns (uint[][] memory) {
@@ -132,8 +182,7 @@ contract MEVFlashBot is ChainlinkClient {
     }
 
     // Fallback function to receive Ether
-    receive()
-   external payable {
+    receive() external payable {
         if (msg.value > 0) {
             emit ReceivedEther(msg.sender, msg.value);
         }
