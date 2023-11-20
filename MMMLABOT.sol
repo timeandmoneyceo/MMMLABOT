@@ -122,14 +122,13 @@ contract MEVFlashBot is ChainlinkClient {
         // Emit an event or perform other actions based on the calculated prediction
         emit MLPredictionReceived("matrixMultiplication", prediction);
     }
-
     // Function to send data to the off-chain machine learning service
     function sendDataToMLService(uint[][] calldata inputData) external onlyOwner {
         Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.receiveMLPrediction.selector);
-        string memory inputString = convertInputDataToString(inputData); 
+        string memory inputString = convertInputDataToString(inputData);
         // Convert input data to string
-        
-        req.add("inputData", inputString); 
+
+        req.add("inputData", inputString);
         // Pass the string as a parameter
 
         sendChainlinkRequestTo(oracle, req, fee);
@@ -174,7 +173,7 @@ contract MEVFlashBot is ChainlinkClient {
     // Function to set the profit matrix for a strategy
     function setStrategyProfit(string calldata parameter, uint[][] calldata profitMatrix) external onlyOwner {
         strategyProfits[parameter] = profitMatrix;
- }
+    }
 
     // Function to get the profit matrix for a strategy
     function getStrategyProfit(string calldata parameter) external view returns (uint[][] memory) {
