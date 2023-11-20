@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.22;
 
+import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 interface IUniswapV2Router {
     function swapExactTokensForTokens(
         uint amountIn,
@@ -11,26 +14,101 @@ interface IUniswapV2Router {
     ) external returns (uint[] memory amounts);
 }
 
-contract MEVFlashBot {
-    // Define necessary variables and mappings
+contract MEVFlashBot is ChainlinkClient {
+    using SafeMath for uint;
+
+    // Chainlink parameters
+    address private oracle;
+    bytes32 private jobId;
+    uint256 private fee;
+
+    // Machine learning prediction
+    uint[][] public prediction;
+
+    // Uniswap Router address
+    address private uniswapRouter = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+
+    // Owner and strategyProfits mapping
     address private owner;
-    mapping(string => uint[][]) public strategyProfits; 
+    mapping(string => uint[][]) public strategyProfits;
 
-    // Add events for machine learning predictions
+    // Events
     event MLPredictionReceived(string parameter, uint[][] prediction);
+    event ReceivedEther(address indexed sender, uint value);
+    event UniswapTradeExecuted(uint[] amounts);
 
-    // Address of Uniswap V2 Router (adjust based on your DEX choice)
-    address private uniswapRouter = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D; 
-
-    // Constructor to set the contract owner
-    constructor() {
-        owner = msg.sender;
-    }
-
-    // Modifier to ensure only the owner can execute certain functions
+    // Modifier
     modifier onlyOwner() {
         require(msg.sender == owner, "Not the contract owner");
         _;
+    }
+
+    // Constructor
+    constructor() {
+        owner = msg.sender;
+
+        oracle = 0xAA1DC356dc4B18f30C347798FD5379F3D77ABC5b;
+        jobId = "c51694e71fa94217b0f4a8b1e0d3e9b8";
+        fee = 0.1 * 10 ** 18; // 0.1 LINK
+    }
+
+    // Function to send data to the off-chain machine learning service
+    function sendDataToMLService(uint[][] calldata inputData) external onlyOwner {
+        Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.receiveMLPrediction.selector);
+        req.add("inputData", inputData);
+        sendChainlinkRequestTo(oracle, req, fee);
+    }
+
+    // Function to receive predictions from the off-chain machine learning service
+    function receiveMLPrediction(bytes32 _requestId, uint[][] calldata _prediction) external recordChainlinkFulfillment(_requestId) {
+        prediction = _prediction;
+        emit MLPredictionReceived("parameter", prediction);
+    }
+
+    // Function to execute MEV strategy
+    function executeMEVStrategy() external onlyOwner {
+        require(prediction.length > 0, "No prediction available");
+
+        uint optimalProfit = 0;
+        address[] memory optimalPath;
+
+        for (uint i = 0; i < prediction.length; i++) {
+            address inputToken = address(prediction[i][0]);
+            address outputToken = address(prediction[i][1]);
+            uint amountIn = prediction[i][2];
+            uint amountOut = prediction[i][3];
+
+            address [oai_citation:1,Error](data:text/plain;charset=utf-8,Unable%20to%20find%20metadata);
+            path[0] = inputToken;
+            path[1] = outputToken;
+
+            uint[] memory amounts = IUniswapV2Router(uniswapRouter).getAmountsOut(amountIn, path);
+            uint profit = amounts[1].sub(amountOut);
+
+            if (profit > optimalProfit) {
+                optimalProfit = profit;
+                optimalPath = path;
+            }
+        }
+
+        require(optimalPath.length > 0, "No optimal path found");
+        executeMEVStrategyWithUniswap(prediction[0][2], prediction[0][3], optimalPath, block.timestamp + 15 minutes);
+    }
+
+    // Function to execute MEV strategy with Uniswap interaction
+    function executeMEVStrategyWithUniswap(uint amountIn, uint amountOutMin, address[] calldata path, uint deadline) internal onlyOwner {
+        require(path.length >= 2, "Invalid path");
+        require(block.timestamp < deadline, "Transaction expired");
+
+        uint[] memory amounts = IUniswapV2Router(uniswapRouter).swapExactTokensForTokens(
+            amountIn,
+            amountOutMin,
+            path,
+            address(this),
+            deadline
+        );
+
+        emit UniswapTradeExecuted(amounts);
     }
 
     // Function to perform matrix multiplication
@@ -60,59 +138,8 @@ contract MEVFlashBot {
         return strategyProfits[parameter];
     }
 
-    // Function to send data to the off-chain machine learning service
-    function sendDataToMLService(uint[][] calldata inputData) external onlyOwner {
-        // TODO: Implement logic to send data to the off-chain service
-        // (You may use an external library or an Oracle service for this purpose)
-    }
-
-    // Function to receive predictions from the off-chain machine learning service
-    function receiveMLPrediction(string calldata parameter, uint[][] calldata prediction) external onlyOwner {
-        // TODO: Implement logic to handle the received prediction
-        emit MLPredictionReceived(parameter, prediction);
-    }
-
-    // Function to execute MEV strategy
-    function executeMEVStrategy() external onlyOwner {
-        // Implement your MEV strategy using matrix multiplication or other methods
-        // Ensure careful consideration of gas costs and potential reverts
-    }
-
-    // Function to execute MEV strategy with Uniswap interaction
-    function executeMEVStrategyWithUniswap(uint amountIn, uint amountOutMin, address[] calldata path, uint deadline) external onlyOwner {
-        // Ensure the path array includes at least two addresses (input and output tokens)
-        require(path.length >= 2, "Invalid path");
-
-        // Ensure the deadline is in the future to prevent front-running
-        require(block.timestamp < deadline, "Transaction expired");
-
-        // Call Uniswap's swapExactTokensForTokens function
-        uint[] memory amounts = IUniswapV2Router(uniswapRouter).swapExactTokensForTokens(
-            amountIn,
-            amountOutMin,
-            path,
-            address(this),
-            deadline
-        );
-
-        // Process the result or perform additional logic based on 'amounts'
-        // amounts[amounts.length - 1] contains the output amount
-
-        // Emit an event or perform other actions based on the Uniswap interaction
-        emit UniswapTradeExecuted(amounts);
-    }
-
-    // Event to be emitted when Ether is received
-    event ReceivedEther(address indexed sender, uint value);
-
-    // Event to be emitted when a Uniswap trade is executed
-    event UniswapTradeExecuted(uint[] amounts);
-
     // Fallback function to receive Ether
     receive() external payable {
-        // This function is executed on a call to the contract if none of the other
-        // functions match the given function signature
-        // Logic to handle received Ether
         if (msg.value > 0) {
             emit ReceivedEther(msg.sender, msg.value);
         }
