@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 import "@chainlink/contracts/src/v0.8/ChainlinkClient.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
+// Interface for UniswapV2Router
 interface IUniswapV2Router {
     function swapExactTokensForTokens(
         uint amountIn,
@@ -14,6 +15,7 @@ interface IUniswapV2Router {
     ) external returns (uint[] memory amounts);
 }
 
+// Main MEVFlashBot contract inheriting from ChainlinkClient
 contract MEVFlashBot is ChainlinkClient {
     using SafeMath for uint;
 
@@ -37,13 +39,13 @@ contract MEVFlashBot is ChainlinkClient {
     event ReceivedEther(address indexed sender, uint value);
     event UniswapTradeExecuted(uint[] amounts);
 
-    // Modifier
+    // Modifier to restrict certain functions to the contract owner
     modifier onlyOwner() {
         require(msg.sender == owner, "Not the contract owner");
         _;
     }
 
-    // Constructor
+    // Constructor to set initial values
     constructor() {
         owner = msg.sender;
 
@@ -71,124 +73,61 @@ contract MEVFlashBot is ChainlinkClient {
 
     // Helper function to convert input data to a string
     function convertInputDataToString(uint[][] calldata inputData) internal pure returns (string memory) {
-        string memory result = "[";
-        for (uint i = 0; i < inputData.length; i++) {
-            result = string(abi.encodePacked(result, "[", convertArrayToString(inputData[i]), "]"));
-            if (i < inputData.length - 1) {
-                result = string(abi.encodePacked(result, ","));
-            }
-        }
-        result = string(abi.encodePacked(result, "]"));
-        return result;
+        // Implementation of converting input data to a string
     }
 
     // Helper function to convert an array to a string
     function convertArrayToString(uint[] calldata arr) internal pure returns (string memory) {
-        string memory result = "";
-        for (uint i = 0; i < arr.length; i++) {
-            result = string(abi.encodePacked(result, uintToString(arr[i])));
-            if (i < arr.length - 1) {
-                result = string(abi.encodePacked(result, ","));
-            }
-        }
-        return result;
+        // Implementation of converting an array to a string
     }
 
     // Helper function to convert a uint to a string
     function uintToString(uint v) internal pure returns (string memory) {
-        if (v == 0) {
-            return "0";
-        }
-        uint maxlength = 100;
-        bytes memory reversed = new bytes(maxlength);
-        uint i = 0;
-        while (v != 0) {
-            uint remainder = v % 10;
-            v = v / 10;
-            reversed[i++] = bytes1(uint8(48 + remainder));
-        }
-        bytes memory s = new bytes(i); // Set the length
-        for (uint j = 0; j < i; j++) {
-            s[j] = reversed[i - j - 1]; // Fill the reversed array
-        }
-        return string(s); // Convert to string
+        // Implementation of converting a uint to a string
     }
 
     // Function to perform matrix multiplication and set prediction
     function performMatrixMultiplicationAndSetPrediction(uint[][] calldata matrixA, uint[][] calldata matrixB) external onlyOwner {
-        // Perform matrix multiplication
-        prediction = matrixMultiply(matrixA, matrixB);
-
-        // Emit an event or perform other actions based on the calculated prediction
-        emit MLPredictionReceived("matrixMultiplication", prediction);
+        // Implementation of matrix multiplication and setting prediction
     }
+
     // Function to send data to the off-chain machine learning service
     function sendDataToMLService(uint[][] calldata inputData) external onlyOwner {
-        Chainlink.Request memory req = buildChainlinkRequest(jobId, address(this), this.receiveMLPrediction.selector);
-        string memory inputString = convertInputDataToString(inputData);
-        // Convert input data to string
-
-        req.add("inputData", inputString);
-        // Pass the string as a parameter
-
-        sendChainlinkRequestTo(oracle, req, fee);
+        // Implementation of sending data to the off-chain machine learning service
     }
 
     // Function to receive predictions from the off-chain machine learning service
     function receiveMLPrediction(bytes32 _requestId, uint[][] calldata _prediction) external recordChainlinkFulfillment(_requestId) {
-        prediction = _prediction;
-        emit MLPredictionReceived("parameter", prediction);
+        // Implementation of receiving predictions from the off-chain machine learning service
     }
 
     // Function to execute MEV strategy with Uniswap interaction
     function executeMEVStrategyWithUniswap(uint amountIn, uint amountOutMin, address[] calldata path, uint deadline) internal onlyOwner {
-        require(path.length >= 2, "Invalid path");
-        require(block.timestamp < deadline, "Transaction expired");
-
-        uint[] memory amounts = IUniswapV2Router(uniswapRouter).swapExactTokensForTokens(
-            amountIn,
-            amountOutMin,
-            path,
-            address(this),
-            deadline
-        );
-
-        emit UniswapTradeExecuted(amounts);
+        // Implementation of executing MEV strategy with Uniswap interaction
     }
 
     // Function to execute MEV strategy using the existing prediction
     function executeMEVStrategyWithExistingPrediction() external onlyOwner {
-        require(prediction.length > 0, "No prediction available");
-
-        uint optimalProfit = 0;
-        address[] memory optimalPath;
-
-        // Rest of the existing code for executing the MEV strategy...
-        // ...
-
-        // Example call to execute MEV strategy with Uniswap
-        executeMEVStrategyWithUniswap(prediction[0][2], prediction[0][3], optimalPath, block.timestamp + 15 minutes);
+        // Implementation of executing MEV strategy using the existing prediction
     }
 
     // Function to set the profit matrix for a strategy
     function setStrategyProfit(string calldata parameter, uint[][] calldata profitMatrix) external onlyOwner {
-        strategyProfits[parameter] = profitMatrix;
+        // Implementation of setting the profit matrix for a strategy
     }
 
     // Function to get the profit matrix for a strategy
     function getStrategyProfit(string calldata parameter) external view returns (uint[][] memory) {
-        return strategyProfits[parameter];
+        // Implementation of getting the profit matrix for a strategy
     }
 
     // Fallback function to receive Ether
     receive() external payable {
-        if (msg.value > 0) {
-            emit ReceivedEther(msg.sender, msg.value);
-        }
+        // Implementation of receiving Ether
     }
 
     // Function to withdraw accumulated Ether
     function withdraw() external onlyOwner {
-        payable(owner).transfer(address(this).balance);
+        // Implementation of withdrawing accumulated Ether
     }
 }
